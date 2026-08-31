@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Gissningslek — Vem har jobbat var?</title>
+  
+  <!-- Vis.js Network Library -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    header {
+      background: linear-gradient(90deg, #0b0f19 0%, #1e1b4b 100%);
+    }
+    .game-banner {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fde047;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guess-panel {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .guess-panel label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #a5b4fc;
+    }
+
+    .guess-panel select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: white;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+    }
+
+    .guess-panel select:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-submit-guesses {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-submit-guesses:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit-guesses:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .score-hero {
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(6, 182, 212, 0.2));
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .score-number {
+      font-family: var(--font-heading);
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #38bdf8, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+
+    .score-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .pwd-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .pwd-input-group input {
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: white;
+      font-size: 1rem;
+      text-align: center;
+      letter-spacing: 0.1em;
+    }
+
+    .result-badge-correct {
+      color: #10b981;
+      font-weight: 700;
+    }
+
+    .result-badge-wrong {
+      color: #ef4444;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navbar -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon" style="background: linear-gradient(135deg, #f59e0b, #ec4899);">❓</div>
+      <div class="brand-text">
+        <h1>CV Gissningslek</h1>
+        <p>Koppla ihop rätt kollega med rätt anonym nod!</p>
+      </div>
+    </div>
+
+    <!-- Info banner -->
+    <div class="game-banner">
+      <span>💡 Mingla & ställ frågor till kollegorna för att fylla i alla noder!</span>
+    </div>
+
+    <!-- Verktyg för leken -->
+    <div class="actions">
+      <button class="action-btn" onclick="resetZoom()">
+        <span>🎯</span> Centrera Vy
+      </button>
+      <button class="action-btn primary" onclick="exportAsPNG()">
+        <span>📷</span> Ladda ner Bild (PNG)
+      </button>
+      <button class="action-btn" onclick="window.print()">
+        <span>🖨️</span> Skriv ut Lekkarta
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    
+    <!-- Graph Canvas Container -->
+    <div id="mynetwork"></div>
+
+    <!-- Floating Sidebar Panel för Leken -->
+    <aside class="sidebar" id="sidebar">
+      
+      <div class="sidebar-header">
+        <h2 id="sidebarTitle">Gissningspanel</h2>
+        <span class="badge" id="progressBadge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber);">0 / 18 GISSADE</span>
+      </div>
+
+      <!-- Node Details & Guessing Box -->
+      <div class="node-details" id="nodeDetails">
+        <div class="node-title-row">
+          <div class="node-avatar-badge" id="nodeBadgeIcon" style="background: #f59e0b;">?</div>
+          <div class="node-title-meta">
+            <h3 id="nodeName">Klicka på en anonym nod</h3>
+            <span id="nodeSubtitle">Markera en nod för att skriva in din gissning</span>
+          </div>
+        </div>
+        <div id="nodeContent">
+          <p style="font-size: 0.82rem; color: var(--text-muted);">
+            Klicka på en anonym nod (t.ex. <strong>Nod 05</strong>) i kartan för att se dess tidigare arbetsplatser och gissa vilken kollega det är!
+          </p>
+        </div>
+      </div>
+
+      <!-- Guess Selector Form -->
+      <div class="guess-panel" id="guessPanel">
+        <label id="guessSelectLabel">Välj vem du tror att den markerade noden är:</label>
+        <select id="userGuessSelect" disabled onchange="onGuessSelectChange()">
+          <option value="">-- Välj markerad nod i kartan först --</option>
+        </select>
+      </div>
+
+      <!-- Submit & Unlock Button -->
+      <button class="btn-submit-guesses" id="btnSubmitAll" onclick="openPasswordModal()">
+        <span>🔒</span> Rätta & Se Poäng
+      </button>
+
+      <!-- Hub-Arbetsplatser Filter -->
+      <div class="hub-filters">
+        <h4>Största Gemensamma Hubbarna</h4>
+        <div class="filter-pills" id="hubFilterPills">
+          <!-- Dynamiskt fyllda via JS -->
+        </div>
+      </div>
+
+      <!-- Regler för leken -->
+      <div class="game-rules">
+        <h4>💡 Reglerna för leken:</h4>
+        <ol style="padding-left: 16px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Klicka på en nod i kartan för att se dess tidigare arbetsplatser.</li>
+          <li>Fråga kollegorna i rummet var de har jobbat.</li>
+          <li>Välj kollegans namn i menyn för varje nod (varje rätt svar ger 1 poäng, max 18 p).</li>
+          <li>När du är klar, klicka på <strong>"Rätta & Se Poäng"</strong> och ange lösenordet från arrangören!</li>
+        </ol>
+      </div>
+
+    </aside>
+
+    <!-- Legend Overlay -->
+    <div class="legend-bar">
+      <div class="legend-item">
+        <div class="legend-circle anon"></div>
+        <span>Anonym Kollega (Nod 01–18)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-circle workplace"></div>
+        <span>Arbetsplats</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-circle hub"></div>
+        <span>Stor Hubb (&gt;3 anställda)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Password Prompt Modal -->
+  <div class="modal-backdrop" id="passwordModal">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>🔒 Ange Lösenord för Rättning</h3>
+        <button class="close-modal-btn" onclick="closePasswordModal()">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <p style="font-size: 0.9rem; color: var(--text-muted);">
+          Ange lösenordet som du fått från arrangören för att rätta dina svar och se ditt resultat!
+        </p>
+
+        <div class="pwd-input-group">
+          <input type="password" id="inputPassword" placeholder="Skriv lösenord..." onkeyup="if(event.key==='Enter') verifyPassword()" />
+          <button class="btn-submit-guesses" onclick="verifyPassword()">Lås upp Resultat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance & Score Results Modal -->
+  <div class="modal-backdrop" id="resultsModal">
+    <div class="modal-card" style="max-width: 750px;">
+      <div class="modal-header">
+        <h3>🏆 Ditt Resultat & Poäng</h3>
+        <button class="close-modal-btn" onclick="closeResultsModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Score Banner -->
+        <div class="score-hero">
+          <div class="score-number" id="finalScoreText">0 / 18</div>
+          <div class="score-title" id="finalTitleText">Bra jobbat!</div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" id="finalSubtext">
+            Varje rätt svar gav 1 poäng.
+          </p>
+        </div>
+
+        <!-- Detailed Evaluation Table -->
+        <h4 style="margin-bottom: 8px; font-family: var(--font-heading);">Sammanställning av dina gissningar:</h4>
+        <table class="facit-table">
+          <thead>
+            <tr>
+              <th>Nod-ID</th>
+              <th>Din Gissning</th>
+              <th>Rätt Svar</th>
+              <th>Poäng</th>
+            </tr>
+          </thead>
+          <tbody id="resultsTableBody">
+            <!-- Dynamiskt fylld via JS -->
+          </tbody>
+        </table>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="action-btn primary" style="flex: 1; justify-content: center; padding: 12px;" onclick="window.print()">
+            <span>🖨️</span> Skriv Ut Mitt Diplom / Resultat
+          </button>
+          <button class="action-btn" style="flex: 1; justify-content: center; padding: 12px;" onclick="closeResultsModal()">
+            Stäng
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="data.js"></script>
+  <script src="lek.js"></script>
+</body>
+</html>

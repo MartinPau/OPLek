@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Neural Network — Master & Facit Vy</title>
+  
+  <!-- Vis.js Network Library -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  
+  <!-- html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Header Navbar -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <h1>CV Neural Network (Facit)</h1>
+        <p>Master-vy & Avslutningsgenomgång</p>
+      </div>
+    </div>
+
+    <!-- Spellägesväljare -->
+    <div class="mode-switcher">
+      <button id="btnModeMaster" class="mode-btn active" onclick="switchMode('master')">
+        <span>🔍</span> Facit (Alla Namn)
+      </button>
+      <button id="btnModeAnon" class="mode-btn" onclick="switchMode('anon')">
+        <span>❓</span> Anonymiserat (Lek-vy)
+      </button>
+      <button id="btnModeQuiz" class="mode-btn" onclick="switchMode('quiz')">
+        <span>🎮</span> Interaktivt Quiz
+      </button>
+    </div>
+
+    <!-- Åtgärder & Export -->
+    <div class="actions">
+      <button class="action-btn" onclick="openFacitModal()">
+        <span>📋</span> Visa Facitlista
+      </button>
+      <button class="action-btn" onclick="resetZoom()">
+        <span>🎯</span> Centrera Vy
+      </button>
+      <button class="action-btn primary" onclick="exportAsPNG()">
+        <span>📷</span> Exportera PNG
+      </button>
+      <button class="action-btn" onclick="window.print()">
+        <span>🖨️</span> Skriv ut
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    
+    <!-- Graph Canvas Container -->
+    <div id="mynetwork"></div>
+
+    <!-- Floating Sidebar Panel -->
+    <aside class="sidebar" id="sidebar">
+      
+      <div class="sidebar-header">
+        <h2 id="sidebarTitle">Nod-Information</h2>
+        <span class="badge" id="modeBadge">FACIT-LÄGE</span>
+      </div>
+
+      <!-- Node Details Box -->
+      <div class="node-details" id="nodeDetails">
+        <div class="node-title-row">
+          <div class="node-avatar-badge" id="nodeBadgeIcon" style="background: #6366f1;">?</div>
+          <div class="node-title-meta">
+            <h3 id="nodeName">Klicka på en nod i kartan</h3>
+            <span id="nodeSubtitle">Välj en kollega eller arbetsplats för mer detaljer</span>
+          </div>
+        </div>
+        <div id="nodeContent">
+          <p style="font-size: 0.82rem; color: var(--text-muted);">
+            När du klickar på en nod upplyses alla kopplingar och du ser exakt vilka kollegor som delar arbetsplatser.
+          </p>
+        </div>
+      </div>
+
+      <!-- Interaktivt Quiz Box (Döljs i Facit-läge) -->
+      <div class="quiz-box" id="quizBox" style="display: none;">
+        <h4> Gissa Vem Kollegan Är!</h4>
+        <p style="font-size: 0.8rem; color: var(--text-muted);" id="quizTargetText">
+          Markera en anonym nod (t.ex. Nod 01) i kartan för att gissa.
+        </p>
+        <select id="personGuessSelect" disabled>
+          <option value="">-- Välj kollega i listan --</option>
+        </select>
+        <button id="btnSubmitGuess" onclick="submitGuess()" disabled>Skicka Gissning</button>
+        
+        <div class="quiz-score-badge">
+          <span>Poäng:</span>
+          <span id="scoreTracker" style="color: var(--accent-cyan);">0 / 0 Rätt</span>
+        </div>
+      </div>
+
+      <!-- Hub-Arbetsplatser Filter -->
+      <div class="hub-filters">
+        <h4>Största Gemensamma Hubbarna</h4>
+        <div class="filter-pills" id="hubFilterPills">
+          <!-- Dynamiskt fyllda via JS -->
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Legend Overlay -->
+    <div class="legend-bar">
+      <div class="legend-item">
+        <div class="legend-circle person"></div>
+        <span>Kollega (Namngiven)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-circle anon"></div>
+        <span>Anonym Nod (Lek-vy)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-circle workplace"></div>
+        <span>Arbetsplats</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-circle hub"></div>
+        <span>Stor Hubb (&gt;3 anställda)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Facit Modal Popup -->
+  <div class="modal-backdrop" id="facitModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📋 Komplett Facitlista för Leken</h3>
+        <button class="close-modal-btn" onclick="closeFacitModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+          Här är den fullständiga nyckeln över alla anställda, deras anonymiserade nod-ID:n samt alla deras tidigare arbetsplatser:
+        </p>
+        <table class="facit-table">
+          <thead>
+            <tr>
+              <th>Nod-ID</th>
+              <th>Namn</th>
+              <th>Arbetsplatser</th>
+            </tr>
+          </thead>
+          <tbody id="facitTableBody">
+            <!-- Dynamiskt fylld via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
