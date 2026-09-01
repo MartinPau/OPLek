@@ -155,6 +155,17 @@ header {
   filter: brightness(1.1);
 }
 
+.action-btn.highlight-print {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+.action-btn.highlight-print:hover {
+  filter: brightness(1.1);
+}
+
 /* Main Container Layout */
 .app-container {
   flex: 1;
@@ -531,23 +542,37 @@ header {
   text-transform: uppercase;
 }
 
-/* Print CSS Rules */
+/* Professional Print CSS Rules (Zero Overlap & High Contrast) */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
   }
 
-  header, .sidebar, .legend-bar, .actions {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header, .sidebar, .legend-bar, .actions, .game-banner, .modal-backdrop {
     display: none !important;
   }
 
   .app-container {
-    height: 100vh;
-    width: 100vw;
+    height: 100vh !important;
+    width: 100vw !important;
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   #mynetwork {
-    background: white !important;
+    background: #ffffff !important;
+    height: 100% !important;
+    width: 100% !important;
   }
 }

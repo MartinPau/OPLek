@@ -1,4 +1,4 @@
-// Standalone Game Logic with Full Physics & Gravity + Smooth In-Place Updates
+// Standalone Game Logic with Full Physics, Zero-Overlap Print Optimization & Password Results
 let network = null;
 let nodesDataSet = new vis.DataSet([]);
 let edgesDataSet = new vis.DataSet([]);
@@ -70,7 +70,7 @@ function buildNetworkData() {
           label: count >= 2 ? `${w} (${count})` : w,
           title: `<b>${w}</b><br>${count} anställda har jobbat här`,
           shape: 'box',
-          margin: 10,
+          margin: 12,
           shapeProperties: { borderRadius: 6 },
           font: {
             color: isHub ? '#ffffff' : '#e2e8f0',
@@ -123,20 +123,21 @@ function renderNetwork() {
 
   const options = {
     physics: {
-      enabled: true, // Gravitation och fysik är ALLTID på så noder kan dras och interagera!
+      enabled: true,
       solver: 'forceAtlas2Based',
       forceAtlas2Based: {
-        gravitationalConstant: -38,
-        centralGravity: 0.008,
-        springLength: 90,
-        springConstant: 0.08,
-        damping: 0.4
+        gravitationalConstant: -80,
+        centralGravity: 0.005,
+        springLength: 130,
+        springConstant: 0.06,
+        damping: 0.5,
+        avoidOverlap: 1.0 // Förhindra överlappning mellan noder
       },
       maxVelocity: 50,
       minVelocity: 0.75,
       stabilization: {
         enabled: true,
-        iterations: 200,
+        iterations: 250,
         updateInterval: 25,
         fit: true
       }
@@ -147,7 +148,7 @@ function renderNetwork() {
       hideEdgesOnDrag: false,
       zoomView: true,
       dragView: true,
-      dragNodes: true // Kan dras runt interaktivt
+      dragNodes: true
     }
   };
 
@@ -250,7 +251,6 @@ function updateSidebar(node) {
     select.disabled = false;
     selectLabel.innerHTML = `Vem tror du gömmer sig bakom <strong style="color:var(--accent-amber);">${p.anonId}</strong>?`;
     
-    // Populate dropdown with available employees
     populateDropdownForNode(p.id);
 
   } else if (node.nodeType === 'workplace') {
@@ -284,7 +284,6 @@ function populateDropdownForNode(currentNodeId) {
   const select = document.getElementById("userGuessSelect");
   const currentGuess = userGuesses[currentNodeId] || "";
 
-  // Collect all employee IDs already picked on OTHER nodes
   const usedEmployeeIds = new Set();
   Object.entries(userGuesses).forEach(([nodeId, guessedId]) => {
     if (nodeId !== currentNodeId && guessedId) {
@@ -292,7 +291,6 @@ function populateDropdownForNode(currentNodeId) {
     }
   });
 
-  // Filter available employees
   const availableEmployees = employeesData.filter(p => !usedEmployeeIds.has(p.id));
   availableEmployees.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -306,7 +304,7 @@ function populateDropdownForNode(currentNodeId) {
   select.value = currentGuess;
 }
 
-// Handle Guess Selection: IN-PLACE Node Update WITHOUT restarting physics or shaking screen
+// Handle Guess Selection: IN-PLACE Node Update
 function onGuessSelectChange() {
   if (!selectedNodeId) return;
   const node = nodesDataSet.get(selectedNodeId);
@@ -322,7 +320,6 @@ function onGuessSelectChange() {
     delete userGuesses[personId];
   }
 
-  // Pure targeted in-place node update (No dataset clear, No graph rebuild, No camera shake)
   const hasGuessed = !!userGuesses[personId];
   const p = node.personData;
   nodesDataSet.update({
@@ -401,7 +398,71 @@ function filterByHub(wpName, btn) {
   }
 }
 
-// Case-Insensitive Password Verification
+// Special Print Optimization Mode: Maximizes Spacing & Ensures Zero Overlap for Printing/Posters
+function optimizeLayoutForPrint() {
+  if (!network) return;
+
+  // 1. Set crisp high-contrast node colors for printing
+  const allNodes = nodesDataSet.get();
+  nodesDataSet.update(allNodes.map(n => {
+    if (n.nodeType === 'person') {
+      return {
+        id: n.id,
+        size: 26,
+        font: { color: '#ffffff', size: 16, strokeWidth: 4, strokeColor: '#0b0f19', bold: true },
+        color: { background: '#f59e0b', border: '#ffffff' }
+      };
+    } else {
+      return {
+        id: n.id,
+        margin: 14,
+        font: { color: '#ffffff', size: 15, strokeWidth: 4, strokeColor: '#0b0f19', bold: true },
+        color: { background: n.employeeCount >= 3 ? '#ec4899' : '#06b6d4', border: '#ffffff' }
+      };
+    }
+  }));
+
+  const allEdges = edgesDataSet.get();
+  edgesDataSet.update(allEdges.map(e => ({
+    id: e.id,
+    color: { color: 'rgba(255, 255, 255, 0.4)' },
+    width: 2
+  })));
+
+  // 2. Apply strong repulsion & wide spring lengths to guarantee 0% node overlap
+  network.setOptions({
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: {
+        gravitationalConstant: -220, // Stark repulsning för maximal spridning
+        centralGravity: 0.002,
+        springLength: 220,          // Långa linjer så texter inte kolliderar
+        springConstant: 0.03,
+        damping: 0.7,
+        avoidOverlap: 1.0           // 100% undvik överlappning
+      },
+      stabilization: {
+        enabled: true,
+        iterations: 400,
+        updateInterval: 25,
+        fit: true
+      }
+    }
+  });
+
+  // Run stabilization
+  network.stabilize(400);
+
+  network.once("stabilizationIterationsDone", () => {
+    network.fit({ animation: false });
+    setTimeout(() => {
+      window.print();
+    }, 400);
+  });
+}
+
+// Password Verification
 function openPasswordModal() {
   document.getElementById("inputPassword").value = "";
   document.getElementById("passwordModal").classList.add("open");
